@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple, Dict, Optional, Iterable
 import csv, os, time, argparse, sys
 
-# A board coordinate; row and column are 0..8
+# Initialize coordinate with its row and column 
 Coord = Tuple[int, int]
 
 def peers_of(r: int, c: int) -> Set[Coord]:
@@ -21,24 +21,24 @@ PEERS: Dict[Coord, Set[Coord]] = {coord: peers_of(*coord) for coord in ALL_COORD
 # -----------------------------
 # SECTION: INPUT (read files)
 # -----------------------------
-def read_sudoku(path: str) -> List[List[int]]:
-    
-    # Read a Sudoku grid from .csv or .txt and return a 9x9 list of ints.
+
+ # Read a Sudoku grid from .csv or .txt and return a 9x9 list of ints.
     # - Allowed empty markers: 0, '.', or blank.
     # - .csv branch uses Python's csv.reader (yields list[str] per row).
     # - .txt branch accepts either '530070000' style lines OR space-separated tokens.
-    
-    ext = os.path.splitext(path)[1].lower()
+
+def read_sudoku(path: str) -> List[List[int]]:
+
+    ext = os.path.splitext(path)[1].lower()  # get file extension
     grid: List[List[int]] = []
 
     if ext == ".csv":
-        # CSV READER NOTE:
-        # csv.reader returns lists of strings (list[str]). We parse each string cell,
+        # csv.reader returns lists of strings (list[str]). Parse each string cell, 
         # strip whitespace, and convert it to an int (0..9). Non-digits become 0.
         with open(path, newline="") as f:
             rd: Iterable[list[str]] = csv.reader(f)  # lists of strings
             for raw_row in rd:
-                if not raw_row:             # skip empty CSV rows
+                if not raw_row:             # if empty row, skip
                     continue
                 vals: List[int] = []
                 # Only consider first 9 columns in the row
@@ -104,4 +104,20 @@ def read_sudoku(path: str) -> List[List[int]]:
     if len(grid) != 9 or any(len(r) != 9 for r in grid):
         raise ValueError("Input is not a valid 9x9 Sudoku grid.")
     return grid
+
+#simple grid print in terminal
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Quick check: load a sudoku file")
+    parser.add_argument("path", nargs="?", help="puzzle file (.txt or .csv)")
+    args = parser.parse_args()
+    if not args.path:
+        print("Usage: python sudoku_ai.py <puzzle.txt|puzzle.csv>")
+        sys.exit(1)
+
+    # Ensure file saved, then run
+    grid = read_sudoku(args.path)
+    print("OK: parsed file — showing grid:")
+    for row in grid:
+        print(" ".join('.' if n == 0 else str(n) for n in row))
 
