@@ -6,17 +6,52 @@ import csv, os, time, argparse, sys
 # Initialize coordinate with its row and column 
 Coord = Tuple[int, int]
 
-def peers_of(r: int, c: int) -> Set[Coord]:
+def peers_of(r, c):
     #Get peer coordinates for cell (r, c)
-    row = {(r, j) for j in range(9) if j != c}
-    col = {(i, c) for i in range(9) if i != r}
+    row = set()
+    j = 0
+    while j < 9:
+        if j != c:
+            row.add((r, j))
+        j += 1
+
+    col = set()
+    i = 0
+    while i < 9:
+        if i != r:
+            col.add((i, c))
+        i += 1
+
     br, bc = (r // 3) * 3, (c // 3) * 3
-    box = {(i, j) for i in range(br, br + 3) for j in range(bc, bc + 3) if (i, j) != (r, c)}
+
+    box = set()
+    i = br
+    while i < br + 3:
+        j = bc
+        while j < bc + 3:
+            if not (i == r and j == c):
+                box.add((i, j))
+            j += 1
+        i += 1
+        
     return row | col | box
 
 # Precompute coordinate list and each cell's peers once (saves time in the solver)
-ALL_COORDS: List[Coord] = [(r, c) for r in range(9) for c in range(9)]
-PEERS: Dict[Coord, Set[Coord]] = {coord: peers_of(*coord) for coord in ALL_COORDS}
+ALL_COORDS: List[Coord] = []
+r = 0
+while r < 9:
+    c = 0
+    while c < 9:
+        ALL_COORDS.append((r, c))
+        c += 1
+    r += 1
+
+PEERS: Dict[Coord, Set[Coord]] = {}
+for coord in ALL_COORDS:
+    r_val = coord[0]
+    c_val = coord[1]
+    the_peers = peers_of(r_val, c_val)
+    PEERS[coord] = the_peers
 
 # -----------------------------
 # SECTION: INPUT (read files)
