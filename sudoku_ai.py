@@ -62,39 +62,40 @@ for coord in ALL_COORDS:
     # - .csv branch uses Python's csv.reader (yields list[str] per row).
     # - .txt branch accepts either '530070000' style lines OR space-separated tokens.
 
-def read_sudoku(path: str) -> List[List[int]]:
+def read_sudoku(path):
 
-    ext = os.path.splitext(path)[1].lower()  # get file extension
-    grid: List[List[int]] = []
+    _, ext = os.path.splitext(path) # get file extension
+    ext = ext.lower() 
+
+    grid = []
 
     if ext == ".csv":
-        # csv.reader returns lists of strings (list[str]). Parse each string cell, 
-        # strip whitespace, and convert it to an int (0..9). Non-digits become 0.
         with open(path, newline="") as f:
-            rd: Iterable[list[str]] = csv.reader(f)  # lists of strings
+            rd = csv.reader(f) # lists of strings
+
             for raw_row in rd:
-                if not raw_row:             # if empty row, skip
+                if not raw_row: # if empty row, skip
                     continue
-                vals: List[int] = []
+                vals = []
+                index = 0
                 # Only consider first 9 columns in the row
-                for cell in raw_row[:9]:
-                    # 'cell' might be '', ' 8 ', '0', '.', 'x', etc. Keep it robust.
-                    token = (cell or "").strip()
-                    if token in ("", "0", "."):
-                        # Empty markers map to 0 (our "empty" representation)
-                        vals.append(0)
+                while index < 9 and index < len(raw_row):
+                    cell = raw_row[index]
+                    # Make sure it's a string and strip surrounding whitespace
+                    token = ("" if cell is None else str(cell)).strip()
+                    if token == "" or token == "." or token == "0":
+                        v = 0
                     else:
                         try:
-                            # int('8') -> 8; int('x') would raise ValueError
                             v = int(token)
-                        except ValueError:
-                            # If not a valid integer, treat as empty (0).
+                        except ValueError: # If it isn't a valid integer (e.g., "x"), treat as empty (0)
                             v = 0
-                        # Enforce bounds 0..9 (any weird numbers become 0)
-                        if v < 0 or v > 9:
+                        if v < 0 or v > 9: # Extra safety: keep only values in 0..9
                             v = 0
-                        vals.append(v)
-                # Only accept rows that decode to exactly 9 numbers
+                    
+                    vals.append(v)
+                    index += 1
+
                 if len(vals) == 9:
                     grid.append(vals)
 
@@ -105,25 +106,52 @@ def read_sudoku(path: str) -> List[List[int]]:
         # 2) space-separated tokens "5 3 0 0 7 0 0 0 0"
         with open(path) as f:
             for line in f:
-                line = line.strip()
-                if not line:                 # skip blank lines
+                if line is None:
+                    continue
+                line = line.strip() 
+                if line == "":
                     continue
 
-                row: List[int] = []
+                row = []
+                
+                # compact style
+                cleaned = ""
+                k = 0
+                while k < len(line):
+                    ch = line[k]
+                    if ch.isdigit() or ch == ".":
+                        cleaned += ch
+                    k += 1
 
-                # First try: compact style (9+ digits/dots in line). We squeeze out spaces.
-                if len(line) >= 9 and all(ch.isdigit() or ch == "." for ch in line.replace(" ", "")):
-                    compact = "".join(ch for ch in line if (ch.isdigit() or ch == "."))
-                    if len(compact) >= 9:
-                        for ch in compact[:9]:
-                            row.append(0 if ch in ("0", ".") else int(ch))
-
-                # Fallback: space-separated style (turn '.' into '0' and split)
+                if len(cleaned) >= 9:
+                    idx = 0
+                    while idx < 9:
+                        ch = cleaned[idx]
+                        if ch == "." or ch == "0":
+                            row.append(0)
+                        else:
+                            try:
+                                val = int(ch)
+                            except ValueError:
+                                val = 0
+                            if val < 0 or val > 9:
+                                val = 0
+                            row.append(val)
+                        idx += 1
+                
+                # space-separated fallback
                 if len(row) != 9:
-                    tokens = [t for t in line.replace(".", "0").split() if t]
+                    replaced = line.replace(".", "0")
+                    pieces = replaced.split()
+                    tokens = []
+                    for t in pieces:
+                        if t:
+                            tokens.append(t)
                     if len(tokens) >= 9:
                         row = []
-                        for t in tokens[:9]:
+                        t_index = 0
+                        while t_index < 9:
+                            t = tokens[t_index]
                             try:
                                 v = int(t)
                             except ValueError:
@@ -131,13 +159,16 @@ def read_sudoku(path: str) -> List[List[int]]:
                             if v < 0 or v > 9:
                                 v = 0
                             row.append(v)
+                            t_index += 1
 
                 if len(row) == 9:
                     grid.append(row)
 
-    # Final shape check: must be exactly 9 rows of 9 ints each
-    if len(grid) != 9 or any(len(r) != 9 for r in grid):
-        raise ValueError("Input is not a valid 9x9 Sudoku grid.")
+    if len(grid) != 9:
+        raise ValueError("Input is not a valid 9x9 Sudoku grid (wrong number of rows).")
+    for r in range(9):
+        if len(grid[r]) != 9:
+            raise ValueError("Input is not a valid 9x9 Sudoku grid (wrong row length).")
     return grid
 
 #simple grid print in terminal
@@ -154,5 +185,5 @@ if __name__ == "__main__":
     grid = read_sudoku(args.path)
     print("OK: parsed file — showing grid:")
     for row in grid:
-        print(" ".join('.' if n == 0 else str(n) for n in row))
+        print(" test".join('.' if n == 0 else str(n) for n in row))
 
