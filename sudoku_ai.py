@@ -287,3 +287,19 @@ def fill_single(board, cand, PEERS):
     return True
 
 
+def select_mrv_cell(board, cand):
+
+    # Return the (r, c) of an empty cell with the fewest candidates
+
+    best = None
+    best_size = 10
+    for r in range(9):
+        for c in range(9):
+            if board[r][c] == 0:
+                k = len(cand[r][c])
+                if k < best_size:
+                    best_size = k
+                    best = (r, c)
+    return best
+
+
