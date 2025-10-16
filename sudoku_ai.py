@@ -171,19 +171,53 @@ def read_sudoku(path):
             raise ValueError("Input is not a valid 9x9 Sudoku grid (wrong row length).")
     return grid
 
-#simple grid print in terminal
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Quick check: load a sudoku file")
-    parser.add_argument("path", nargs="?", help="puzzle file (.txt or .csv)")
-    args = parser.parse_args()
-    if not args.path:
-        print("Usage: python sudoku_ai.py <puzzle.txt|puzzle.csv>")
-        sys.exit(1)
 
-    # Ensure file saved, then run
-    grid = read_sudoku(args.path)
-    print("OK: parsed file — showing grid:")
-    for row in grid:
-        print(" test".join('.' if n == 0 else str(n) for n in row))
+def is_valid_answer(board):
+    
+    # Return False if any row/col/box has a duplicate non-zero number.
+    # Otherwise True. This rejects illegal inputs early.
+    
+    # rows
+    for r in range(9):
+        seen = set()
+        for c in range(9):
+            v = board[r][c]
+            if v != 0:
+                if v in seen:
+                    return False
+                seen.add(v)
+
+    # columns
+    for c in range(9):
+        seen = set()
+        for r in range(9):
+            v = board[r][c]
+            if v != 0:
+                if v in seen:
+                    return False
+                seen.add(v)
+
+    # 3x3 boxes 
+    for br in range(0, 9, 3):       # br = 0, 3, 6
+        for bc in range(0, 9, 3):   # bc = 0, 3, 6
+            seen = set()
+            for r in range(br, br + 3):
+                for c in range(bc, bc + 3):
+                    v = board[r][c]
+                    if v != 0:
+                        if v in seen:
+                            return False
+                        seen.add(v)
+    return True
+
+
+def board_complete(board):
+    # True if there are no zeros on the board.
+    for r in range(9):
+        for c in range(9):
+            if board[r][c] == 0:
+                return False
+    return True
+
+
 
