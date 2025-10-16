@@ -57,10 +57,10 @@ for coord in ALL_COORDS:
 # SECTION: INPUT (read files)
 # -----------------------------
 
- # Read a Sudoku grid from .csv or .txt and return a 9x9 list of ints.
-    # - Allowed empty markers: 0, '.', or blank.
-    # - .csv branch uses Python's csv.reader (yields list[str] per row).
-    # - .txt branch accepts either '530070000' style lines OR space-separated tokens.
+ # Read a Sudoku grid from .csv or .txt and return a 9x9 list of ints
+    # - Allowed empty markers: 0, '.', or blank
+    # - .csv branch uses Python's csv.reader (yields list[str] per row)
+    # - .txt branch accepts either '530070000' style lines OR space-separated tokens
 
 def read_sudoku(path):
 
@@ -174,9 +174,9 @@ def read_sudoku(path):
 
 def is_valid_answer(board):
     
-    # Return False if any row/col/box has a duplicate non-zero number.
-    # Otherwise True. This rejects illegal inputs early.
-    
+    # Return False if any row/col/box has a duplicate non-zero number
+    # Otherwise True. This rejects illegal inputs early
+
     # rows
     for r in range(9):
         seen = set()
@@ -212,12 +212,78 @@ def is_valid_answer(board):
 
 
 def board_complete(board):
-    # True if there are no zeros on the board.
+    # True if there are no zeros on the board
     for r in range(9):
         for c in range(9):
             if board[r][c] == 0:
                 return False
     return True
 
+
+def possible_candidates(board, PEERS):
+    
+    # Build a 9x9 grid of candidate possible sets, then do a elimination pass
+    
+    cand = []
+    for r in range(9):
+        row_sets = []
+        for c in range(9):
+            v = board[r][c]
+            if v != 0:
+                row_sets.append({v})
+            else:
+                row_sets.append({1,2,3,4,5,6,7,8,9})
+        cand.append(row_sets)
+
+    # repeatedly remove fixed values from peers until no change
+    changed = True
+    while changed:
+        changed = False
+        for r in range(9):
+            for c in range(9):
+                if len(cand[r][c]) == 1:
+                    v = next(iter(cand[r][c]))
+                    for peer in PEERS[(r, c)]:
+                        pr = peer[0]
+                        pc = peer[1]
+                        if v in cand[pr][pc] and len(cand[pr][pc]) > 1:
+                            cand[pr][pc].remove(v)
+                            changed = True
+    return cand
+
+def fill_single(board, cand, PEERS):
+
+    # Fill any cell that has exactly one candidate
+    # Return False on contradiction (an empty cell left with no candidates)
+    
+    progress = True
+    while progress:
+        progress = False
+
+        for r in range(9):
+            for c in range(9):
+                # fill single answer
+                if board[r][c] == 0 and len(cand[r][c]) == 1:
+                    v = next(iter(cand[r][c]))
+                    board[r][c] = v
+
+                    # remove v from peers
+                    for peer in PEERS[(r, c)]:
+                        pr = peer[0]
+                        pc = peer[1]
+                        if v in cand[pr][pc]:
+                            cand[pr][pc].discard(v)
+                            # contradiction: empty cell with no candidates
+                            if board[pr][pc] == 0 and len(cand[pr][pc]) == 0:
+                                return False
+                    progress = True
+
+        # Check for contradictions anywhere
+        for r in range(9):
+            for c in range(9):
+                if board[r][c] == 0 and len(cand[r][c]) == 0:
+                    return False
+
+    return True
 
 
