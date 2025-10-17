@@ -40,6 +40,10 @@
         (sampleAt ?s - sample ?w - waypoint) ;Where does the sample belong to
 
         (traversable ?w1 - waypoint ?w2 - waypoint) ;are two waypoints connected
+
+        ;goal predicates
+        (dataCollected ?d - (either image scan)) ;data has been collected
+        (sampleCollected ?s - sample) ;sample has been collected
     )
 
 ;moves the rover from one waypoint to another if its traversable
@@ -130,6 +134,7 @@
             (not (roverData ?r ?d) )
             (not (roverHasData ?r))
             (landerData ?l ?d)
+            (dataCollected ?d)
         )
 )
 
@@ -151,6 +156,7 @@
             (not (collectedSample ?r ?s))
             (landerHasSample ?l)
             (landerSample ?l ?s)
+            (sampleCollected ?s)
         )
 )
 

@@ -58,9 +58,9 @@
 
   (:goal
       (and
-          (landerData lander1 image5)
-          (landerData lander1 scan3)
-          (landerSample lander1 sample1)
+          (dataCollected image5)
+          (dataCollected scan3)
+          (sampleCollected sample1)
       )
   )
 )
