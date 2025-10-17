@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Dict, Optional, Iterable
 import csv, os, time, argparse, sys
+from copy import deepcopy
 
 # Initialize coordinate with its row and column 
 Coord = Tuple[int, int]
@@ -289,7 +290,7 @@ def fill_single(board, cand, PEERS):
 
 def select_mrv_cell(board, cand):
 
-    # Return the (r, c) of an empty cell with the fewest candidates
+    # Return the (r, c) of an empty cell with the Minimum Remaining Values/fewest candidates
 
     best = None
     best_size = 10
@@ -301,5 +302,52 @@ def select_mrv_cell(board, cand):
                     best_size = k
                     best = (r, c)
     return best
+
+def solve_backtrack(board, cand, PEERS, depth=0):
+    # 1) do all singles first
+    if not fill_single(board, cand, PEERS):
+        return False
+
+    # 2) solved?
+    if board_complete(board):
+        return True
+
+    # 3) pick the least candidate empty cell
+    cell = select_mrv_cell(board, cand)
+    if cell is None:  # defensive; board_complete should catch this
+        return True
+    r, c = cell
+    # dead-end if no candidates
+    if len(cand[r][c]) == 0:
+        return False
+
+    # 4) try candidates (smallest first like the video)
+    for v in sorted(cand[r][c]):
+        b2 = deepcopy(board)
+        c2 = deepcopy(cand)
+
+        # assign the guess
+        b2[r][c] = v
+        c2[r][c] = {v}
+
+        # forward-check: remove v from peers immediately
+        consistent = True
+        for pr, pc in PEERS[(r, c)]:
+            if v in c2[pr][pc]:
+                c2[pr][pc].discard(v)
+                if b2[pr][pc] == 0 and len(c2[pr][pc]) == 0:
+                    consistent = False
+                    break
+
+        # recurse if still consistent
+        if consistent and solve_backtrack(b2, c2, PEERS, depth + 1):
+            # copy solution back
+            for rr in range(9):
+                for cc in range(9):
+                    board[rr][cc] = b2[rr][cc]
+            return True
+
+    # 5) no candidate worked here → backtrack
+    return False
 
 
