@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple, Dict, Optional, Iterable
 import csv, os, time, argparse, sys
 from copy import deepcopy
+import time
 
 # Initialize coordinate with its row and column 
 Coord = Tuple[int, int]
@@ -352,4 +353,19 @@ def solve_backtrack(board, cand, PEERS, depth=0):
     # 5) no candidate worked here → backtrack
     return False
 
+def solve_sudoku(board, PEERS):
+    
+    # Return (ok, solved_board, ms). 'board' is modified in place.
+    
+    start = time.perf_counter()
+
+    if not is_valid_answer(board):
+        ms = (time.perf_counter() - start) * 1000.0
+        return False, board, ms
+
+    cand = possible_candidates(board, PEERS)
+    solve = solve_backtrack(board, cand, PEERS)
+
+    ms = (time.perf_counter() - start) * 1000.0
+    return solve, board, ms
 
