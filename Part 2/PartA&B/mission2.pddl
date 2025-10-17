@@ -1,5 +1,5 @@
-(define (problem mission2)
-  (:domain spaceDomain)
+(define (problem lunar-mission-2)
+  (:domain lunar)
 
   (:objects
       ;waypoints

@@ -1,5 +1,5 @@
 
-(define (domain spaceDomain)
+(define (domain lunar)
     (:requirements
         :strips :typing
     )
