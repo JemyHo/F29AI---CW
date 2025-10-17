@@ -340,11 +340,13 @@ def solve_backtrack(board, cand, PEERS, depth=0):
                     break
 
         # recurse if still consistent
-        if consistent and solve_backtrack(b2, c2, PEERS, depth + 1):
+        if consistent:
+            solved = solve_backtrack(b2, c2, PEERS, depth + 1)
+            if solved: 
             # copy solution back
-            for rr in range(9):
-                for cc in range(9):
-                    board[rr][cc] = b2[rr][cc]
+                for rr in range(9):
+                    for cc in range(9):
+                        board[rr][cc] = b2[rr][cc]
             return True
 
     # 5) no candidate worked here → backtrack
