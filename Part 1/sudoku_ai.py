@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple, Dict, Optional, Iterable
 import csv, os, time, argparse, sys
 from copy import deepcopy
-import time
+import time as _time
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
 # Initialize coordinate with its row and column 
 Coord = Tuple[int, int]
@@ -173,7 +175,9 @@ def read_sudoku(path):
             raise ValueError("Input is not a valid 9x9 Sudoku grid (wrong row length).")
     return grid
 
-
+# -----------------------------
+# SECTION: Solving 
+# -----------------------------
 def is_valid_answer(board):
     
     # Return False if any row/col/box has a duplicate non-zero number
@@ -369,3 +373,116 @@ def solve_sudoku(board, PEERS):
     ms = (time.perf_counter() - start) * 1000.0
     return solve, board, ms
 
+# -----------------------------
+# SECTION: GUI 
+# -----------------------------
+CELL_SIZE = 44
+GRID_SIZE = CELL_SIZE * 9
+PAD = 10
+FONT_CELL = ("Helvetica", 16, "bold")
+
+class SudokuViewer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Sudoku Viewer")
+
+        # board model (9x9 ints, 0 = empty)
+        self.board = [[0]*9 for _ in range(9)]
+
+        # canvas for grid + numbers
+        self.canvas = tk.Canvas(
+            self.root,
+            width=GRID_SIZE + 2*PAD,
+            height=GRID_SIZE + 2*PAD,
+            bg="white"
+        )
+        self.canvas.grid(row=0, column=0, columnspan=2, padx=8, pady=8)
+
+        # buttons
+        tk.Button(self.root, text="Load…", command=self.on_load).grid(
+            row=1, column=0, sticky="ew", padx=6, pady=6
+        )
+        tk.Button(self.root, text="Clear", command=self.on_clear).grid(
+            row=1, column=1, sticky="ew", padx=6, pady=6
+        )
+
+        # initial draw (blank grid)
+        self.draw_board(self.board)
+
+    def on_clear(self):
+        self.board = [[0]*9 for _ in range(9)]
+        self.draw_board(self.board)
+
+    def on_load(self):
+        path = filedialog.askopenfilename(
+            title="Open Sudoku (.csv or .txt)",
+            filetypes=[("Sudoku Files", "*.csv *.txt"), ("All Files", "*.*")]
+        )
+        if not path:
+            return
+        try:
+            grid = read_sudoku(path)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read file:\n{e}")
+            return
+        self.board = deepcopy(grid)
+        self.draw_board(self.board)
+
+    def draw_board(self, board):
+        self.canvas.delete("all")
+        x0 = PAD
+        y0 = PAD
+
+        # cells + digits
+        for r in range(9):
+            for c in range(9):
+                x1 = x0 + c * CELL_SIZE
+                y1 = y0 + r * CELL_SIZE
+                x2 = x1 + CELL_SIZE
+                y2 = y1 + CELL_SIZE
+
+                # cell rect
+                self.canvas.create_rectangle(x1, y1, x2, y2, fill="white", outline="#bbb")
+
+                # number (if any)
+                v = board[r][c]
+                if v != 0:
+                    self.canvas.create_text(
+                        (x1+x2)//2, (y1+y2)//2,
+                        text=str(v),
+                        font=FONT_CELL
+                    )
+
+        # heavy 3x3 box lines
+        for i in range(10):
+            width = 3 if i % 3 == 0 else 1
+            xi = x0 + i * CELL_SIZE
+            yi = y0 + i * CELL_SIZE
+            # vertical
+            self.canvas.create_line(xi, y0, xi, y0 + GRID_SIZE, fill="#333", width=width)
+            # horizontal
+            self.canvas.create_line(x0, yi, x0 + GRID_SIZE, yi, fill="#333", width=width)
+
+
+def launch_viewer(initial_path=None):
+    root = tk.Tk()
+    app = SudokuViewer(root)
+
+    # if a path was provided on launch, try to load it
+    if initial_path:
+        try:
+            grid = read_sudoku(initial_path)
+            app.board = deepcopy(grid)
+            app.draw_board(app.board)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read file:\n{e}")
+
+    root.mainloop()
+
+# If run directly:
+# - with a path: shows that puzzle
+# - without a path: shows blank grid
+if __name__ == "__main__":
+    # If user passed a file path (txt/csv), load it; else show blank
+    path_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    launch_viewer(path_arg)
