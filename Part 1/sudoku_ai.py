@@ -57,6 +57,16 @@ for coord in ALL_COORDS:
     the_peers = peers_of(r_val, c_val)
     PEERS[coord] = the_peers
 
+# Pre define Stats to record 
+class Stats:
+    def __init__(self):
+        self.steps = 0
+        self.recursive_calls = 0
+        self.backtracks = 0
+        self.start = 0.0
+        self.end = 0.0
+
+
 # -----------------------------
 # SECTION: INPUT (read files)
 # -----------------------------
@@ -257,39 +267,37 @@ def possible_candidates(board, PEERS):
                             changed = True
     return cand
 
-def fill_single(board, cand, PEERS):
-
-    # Fill any cell that has exactly one candidate
-    # Return False on contradiction (an empty cell left with no candidates)
-    
+def fill_single(board, cand, PEERS, stats: Stats | None = None):
+    """
+    Fill any cell with exactly one candidate.
+    If stats is provided, count each placement as a step.
+    Return False on contradiction; True otherwise.
+    """
     progress = True
     while progress:
         progress = False
 
         for r in range(9):
             for c in range(9):
-                # fill single answer
                 if board[r][c] == 0 and len(cand[r][c]) == 1:
                     v = next(iter(cand[r][c]))
                     board[r][c] = v
+                    if stats is not None:
+                        stats.steps += 1  # count deterministic placement
 
                     # remove v from peers
-                    for peer in PEERS[(r, c)]:
-                        pr = peer[0]
-                        pc = peer[1]
+                    for pr, pc in PEERS[(r, c)]:
                         if v in cand[pr][pc]:
                             cand[pr][pc].discard(v)
-                            # contradiction: empty cell with no candidates
                             if board[pr][pc] == 0 and len(cand[pr][pc]) == 0:
                                 return False
                     progress = True
 
-        # Check for contradictions anywhere
+        # global contradiction check
         for r in range(9):
             for c in range(9):
                 if board[r][c] == 0 and len(cand[r][c]) == 0:
                     return False
-
     return True
 
 
@@ -308,34 +316,37 @@ def select_mrv_cell(board, cand):
                     best = (r, c)
     return best
 
-def solve_backtrack(board, cand, PEERS, depth=0):
-    # 1) do all singles first
-    if not fill_single(board, cand, PEERS):
+def solve_backtrack(board, cand, PEERS, stats: Stats | None = None, depth=0):
+    if stats is not None:
+        stats.recursive_calls += 1
+
+    # 1) singles
+    if not fill_single(board, cand, PEERS, stats=stats):
         return False
 
-    # 2) solved?
+    # 2) done?
     if board_complete(board):
         return True
 
-    # 3) pick the least candidate empty cell
+    # 3) MRV cell
     cell = select_mrv_cell(board, cand)
-    if cell is None:  # defensive; board_complete should catch this
+    if cell is None:
         return True
     r, c = cell
-    # dead-end if no candidates
     if len(cand[r][c]) == 0:
         return False
 
-    # 4) try candidates (smallest first like the video)
+    # 4) try candidates
     for v in sorted(cand[r][c]):
         b2 = deepcopy(board)
         c2 = deepcopy(cand)
 
-        # assign the guess
         b2[r][c] = v
         c2[r][c] = {v}
+        if stats is not None:
+            stats.steps += 1  # count the guess
 
-        # forward-check: remove v from peers immediately
+        # forward-check
         consistent = True
         for pr, pc in PEERS[(r, c)]:
             if v in c2[pr][pc]:
@@ -344,34 +355,33 @@ def solve_backtrack(board, cand, PEERS, depth=0):
                     consistent = False
                     break
 
-        # recurse if still consistent
-        if consistent:
-            solved = solve_backtrack(b2, c2, PEERS, depth + 1)
-            if solved: 
-            # copy solution back
-                for rr in range(9):
-                    for cc in range(9):
-                        board[rr][cc] = b2[rr][cc]
+        if consistent and solve_backtrack(b2, c2, PEERS, stats=stats, depth=depth+1):
+            # copy solution up
+            for rr in range(9):
+                for cc in range(9):
+                    board[rr][cc] = b2[rr][cc]
             return True
 
-    # 5) no candidate worked here → backtrack
+        if stats is not None:
+            stats.backtracks += 1  # this guess failed
+
     return False
 
 def solve_sudoku(board, PEERS):
-    
-    # Return (ok, solved_board, ms). 'board' is modified in place.
-    
-    start = time.perf_counter()
+    stats = Stats()
+    stats.start = _time.perf_counter()
 
     if not is_valid_answer(board):
-        ms = (time.perf_counter() - start) * 1000.0
-        return False, board, ms
+        stats.end = _time.perf_counter()
+        ms = (stats.end - stats.start) * 1000.0
+        return False, board, ms, stats
 
     cand = possible_candidates(board, PEERS)
-    solve = solve_backtrack(board, cand, PEERS)
+    ok = solve_backtrack(board, cand, PEERS, stats=stats)
 
-    ms = (time.perf_counter() - start) * 1000.0
-    return solve, board, ms
+    stats.end = _time.perf_counter()
+    ms = (stats.end - stats.start) * 1000.0
+    return ok, board, ms, stats
 
 # -----------------------------
 # SECTION: GUI 
@@ -386,31 +396,52 @@ class SudokuViewer:
         self.root = root
         self.root.title("Sudoku Viewer")
 
-        # board model (9x9 ints, 0 = empty)
         self.board = [[0]*9 for _ in range(9)]
 
-        # canvas for grid + numbers
+        # LEFT: canvas
         self.canvas = tk.Canvas(
             self.root,
             width=GRID_SIZE + 2*PAD,
             height=GRID_SIZE + 2*PAD,
             bg="white"
         )
-        self.canvas.grid(row=0, column=0, columnspan=2, padx=8, pady=8)
+        # put canvas in column 0; rowspan so it aligns with the right panel height
+        self.canvas.grid(row=0, column=0, rowspan=3, padx=8, pady=8)
+
+        # RIGHT: controls + stats
+        right = tk.Frame(self.root)
+        right.grid(row=0, column=1, sticky="n", padx=(0, 10), pady=8)
 
         # buttons
-        tk.Button(self.root, text="Load…", command=self.on_load).grid(
-            row=1, column=0, sticky="ew", padx=6, pady=6
-        )
-        tk.Button(self.root, text="Clear", command=self.on_clear).grid(
-            row=1, column=1, sticky="ew", padx=6, pady=6
-        )
+        tk.Button(right, text="Load…", command=self.on_load, width=16).grid(row=0, column=0, pady=4, sticky="ew")
+        tk.Button(right, text="Clear",  command=self.on_clear, width=16).grid(row=1, column=0, pady=4, sticky="ew")
+        tk.Button(right, text="Solve",  command=self.on_solve, width=16).grid(row=2, column=0, pady=4, sticky="ew")
 
-        # initial draw (blank grid)
+        # spacing
+        tk.Label(right, text="").grid(row=3, column=0, pady=(6, 0))
+
+        # stats labels (we’ll update them in code)
+        self.var_time  = tk.StringVar(value="Time: —")
+        self.var_steps = tk.StringVar(value="Steps: 0")
+        self.var_calls = tk.StringVar(value="Recursive calls: 0")
+        self.var_backs = tk.StringVar(value="Backtracks: 0")
+
+        tk.Label(right, textvariable=self.var_time,  anchor="w", width=24).grid(row=4, column=0, sticky="w", pady=2)
+        tk.Label(right, textvariable=self.var_steps, anchor="w", width=24).grid(row=5, column=0, sticky="w", pady=2)
+        tk.Label(right, textvariable=self.var_calls, anchor="w", width=24).grid(row=6, column=0, sticky="w", pady=2)
+        tk.Label(right, textvariable=self.var_backs, anchor="w", width=24).grid(row=7, column=0, sticky="w", pady=2)
+
         self.draw_board(self.board)
+
+    def _reset_stats_labels(self):
+        self.var_time.set("Time: —")
+        self.var_steps.set("Steps: 0")
+        self.var_calls.set("Recursive calls: 0")
+        self.var_backs.set("Backtracks: 0")
 
     def on_clear(self):
         self.board = [[0]*9 for _ in range(9)]
+        self._reset_stats_labels()
         self.draw_board(self.board)
 
     def on_load(self):
@@ -426,7 +457,33 @@ class SudokuViewer:
             messagebox.showerror("Error", f"Failed to read file:\n{e}")
             return
         self.board = deepcopy(grid)
+        self._reset_stats_labels()
         self.draw_board(self.board)
+
+    def on_solve(self):
+        # ensure something is loaded
+        if not any(any(cell != 0 for cell in row) for row in self.board):
+            messagebox.showinfo("Info", "Load a puzzle first.")
+            return
+
+        # solve on a copy; solver mutates in place
+        bcopy = deepcopy(self.board)
+        ok, solved_board, elapsed_ms, stats = solve_sudoku(bcopy, PEERS)
+
+        # update right-panel labels using returned stats
+        self.var_time.set(f"Time: {elapsed_ms:.2f} ms")
+        self.var_steps.set(f"Steps: {stats.steps}")
+        self.var_calls.set(f"Recursive calls: {stats.recursive_calls}")
+        self.var_backs.set(f"Backtracks: {stats.backtracks}")
+
+        if not ok:
+            messagebox.showwarning("Unsolvable", "No solution exists for this puzzle.")
+            return
+
+        # show solved board
+        self.board = solved_board
+        self.draw_board(self.board)
+
 
     def draw_board(self, board):
         self.canvas.delete("all")
@@ -441,26 +498,18 @@ class SudokuViewer:
                 x2 = x1 + CELL_SIZE
                 y2 = y1 + CELL_SIZE
 
-                # cell rect
                 self.canvas.create_rectangle(x1, y1, x2, y2, fill="white", outline="#bbb")
 
-                # number (if any)
                 v = board[r][c]
                 if v != 0:
-                    self.canvas.create_text(
-                        (x1+x2)//2, (y1+y2)//2,
-                        text=str(v),
-                        font=FONT_CELL
-                    )
+                    self.canvas.create_text((x1+x2)//2, (y1+y2)//2, text=str(v), font=FONT_CELL)
 
-        # heavy 3x3 box lines
+        # bold 3x3 lines
         for i in range(10):
             width = 3 if i % 3 == 0 else 1
             xi = x0 + i * CELL_SIZE
             yi = y0 + i * CELL_SIZE
-            # vertical
             self.canvas.create_line(xi, y0, xi, y0 + GRID_SIZE, fill="#333", width=width)
-            # horizontal
             self.canvas.create_line(x0, yi, x0 + GRID_SIZE, yi, fill="#333", width=width)
 
 
