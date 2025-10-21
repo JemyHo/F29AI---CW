@@ -61,20 +61,22 @@
       (astronautAtControlRoom Bob)
       (astronautLander Bob lander2)
 
-      ;lander state
+      ;lander1 state
       (landerDeployed lander1)
       (landerDoesNotHaveSample lander1)
       (landerAt lander1 w2)
 
+      ;lander2 state
       (landerUndeployed lander2)
       (landerDoesNotHaveSample lander2)
 
-      ;rover state
+      ;rover1 state
       (roverAt rover1 w2)
       (roverDeployed rover1)
       (belongsTo rover1 lander1)
       (roverDoesNotHaveData rover1)
 
+      ;rover2 state
       (roverUndeployed rover2)
       (belongsTo rover2 lander2)
       (roverDoesNotHaveData rover2)

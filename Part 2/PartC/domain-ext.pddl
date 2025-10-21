@@ -5,6 +5,7 @@
     )
 
     (:types
+        ;all the types used in domain
         lander
         rover
         waypoint
@@ -21,7 +22,7 @@
 
         ;rover deployed?
         (roverUndeployed ?r - rover)
-        (roverDeployed ?r - rover)
+(roverDeployed ?r - rover)
 
         (roverAt ?r - rover ?w - waypoint) ;location of rover
         (roverDoesNotHaveData ?r - rover)
@@ -51,6 +52,7 @@
         (sampleCollected ?s - sample) ;sample has been collected
     )
 
+    ;moves the astronaut from docking bay to control room
     (:action moveAstronautControlRoom
         :parameters (?a - astronaut)
         :precondition 
@@ -64,6 +66,7 @@
             )
     )
     
+    ;moves the astronaut from control room to docking bay
     (:action moveAstronautDockingBay
         :parameters (?a - astronaut)
         :precondition 
@@ -77,7 +80,6 @@
             )
     )
     
-
     ;moves the rover from one waypoint to another if its traversable
     (:action moveRover
         :parameters
