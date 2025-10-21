@@ -5,6 +5,8 @@ Sudoku
 1) Implemented Input File and Reading File
 2) Added test file of txt and csv
 3) Added a simple output to terminal to display sudoku problem
-4) implementing solver 
+4) implemented solver
+5) Implemented GUI
+6) Reporting
 
 PDDL
