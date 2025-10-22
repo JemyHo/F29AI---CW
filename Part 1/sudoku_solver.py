@@ -66,7 +66,6 @@ class Stats:
         self.start = 0.0
         self.end = 0.0
 
-
 # -----------------------------
 # SECTION: INPUT (read files)
 # -----------------------------
@@ -188,7 +187,7 @@ def read_sudoku(path):
 # -----------------------------
 # SECTION: Solving 
 # -----------------------------
-def is_valid_answer(board):
+def is_valid_board(board):
     
     # Return False if any row/col/box has a duplicate non-zero number
     # Otherwise True. This rejects illegal inputs early
@@ -268,11 +267,11 @@ def possible_candidates(board, PEERS):
     return cand
 
 def fill_single(board, cand, PEERS, stats: Stats | None = None):
-    """
-    Fill any cell with exactly one candidate.
-    If stats is provided, count each placement as a step.
-    Return False on contradiction; True otherwise.
-    """
+    
+    # Fill any cell with exactly one candidate.
+    # If stats is provided, count each placement as a step.
+    # Return False on contradiction; True otherwise.
+    
     progress = True
     while progress:
         progress = False
@@ -367,11 +366,11 @@ def solve_backtrack(board, cand, PEERS, stats: Stats | None = None, depth=0):
 
     return False
 
-def solve_sudoku(board, PEERS):
+def solve_sudoku(board, PEERS): #Wrapper that organize and return things you need.
     stats = Stats()
-    stats.start = _time.perf_counter()
+    stats.start = _time.perf_counter() 
 
-    if not is_valid_answer(board):
+    if not is_valid_board(board):
         stats.end = _time.perf_counter()
         ms = (stats.end - stats.start) * 1000.0
         return False, board, ms, stats
@@ -393,84 +392,109 @@ FONT_CELL = ("Helvetica", 16, "bold")
 
 class SudokuViewer:
     def __init__(self, root):
+        # keep a handle to the Tk root window
         self.root = root
         self.root.title("Sudoku Viewer")
 
-        self.board = [[0]*9 for _ in range(9)]
+        # a 9x9 board (ints, 0 means empty)
+        self.board = [[0] * 9 for _ in range(9)]
 
-        # LEFT: canvas
+        #  LEFT: drawing canvas
+        canvas_width  = GRID_SIZE + 2 * PAD
+        canvas_height = GRID_SIZE + 2 * PAD
+
         self.canvas = tk.Canvas(
             self.root,
-            width=GRID_SIZE + 2*PAD,
-            height=GRID_SIZE + 2*PAD,
+            width=canvas_width,
+            height=canvas_height,
             bg="white"
         )
-        # put canvas in column 0; rowspan so it aligns with the right panel height
+        # put the canvas at (row=0, col=0); it spans 3 rows vertically
         self.canvas.grid(row=0, column=0, rowspan=3, padx=8, pady=8)
 
-        # RIGHT: controls + stats
+        # ---------- RIGHT: controls + stats in a frame ----------
         right = tk.Frame(self.root)
         right.grid(row=0, column=1, sticky="n", padx=(0, 10), pady=8)
 
-        # buttons
-        tk.Button(right, text="Load…", command=self.on_load, width=16).grid(row=0, column=0, pady=4, sticky="ew")
-        tk.Button(right, text="Clear",  command=self.on_clear, width=16).grid(row=1, column=0, pady=4, sticky="ew")
-        tk.Button(right, text="Solve",  command=self.on_solve, width=16).grid(row=2, column=0, pady=4, sticky="ew")
+        # --- buttons row-by-row ---
+        self.btn_load = tk.Button(right, text="Load…", width=16, command=self.on_load)
+        self.btn_load.grid(row=0, column=0, pady=4, sticky="ew")
 
-        # spacing
-        tk.Label(right, text="").grid(row=3, column=0, pady=(6, 0))
+        self.btn_clear = tk.Button(right, text="Clear", width=16, command=self.on_clear)
+        self.btn_clear.grid(row=1, column=0, pady=4, sticky="ew")
 
-        # stats labels (we’ll update them in code)
+        self.btn_solve = tk.Button(right, text="Solve", width=16, command=self.on_solve)
+        self.btn_solve.grid(row=2, column=0, pady=4, sticky="ew")
+
+        # spacer (empty label just to add vertical space)
+        spacer = tk.Label(right, text="")
+        spacer.grid(row=3, column=0, pady=(6, 0))
+
+        # --- stats labels use StringVars so we can update text later ---
         self.var_time  = tk.StringVar(value="Time: —")
         self.var_steps = tk.StringVar(value="Steps: 0")
         self.var_calls = tk.StringVar(value="Recursive calls: 0")
         self.var_backs = tk.StringVar(value="Backtracks: 0")
 
-        tk.Label(right, textvariable=self.var_time,  anchor="w", width=24).grid(row=4, column=0, sticky="w", pady=2)
-        tk.Label(right, textvariable=self.var_steps, anchor="w", width=24).grid(row=5, column=0, sticky="w", pady=2)
-        tk.Label(right, textvariable=self.var_calls, anchor="w", width=24).grid(row=6, column=0, sticky="w", pady=2)
-        tk.Label(right, textvariable=self.var_backs, anchor="w", width=24).grid(row=7, column=0, sticky="w", pady=2)
+        self.lbl_time  = tk.Label(right, textvariable=self.var_time,  anchor="w", width=24)
+        self.lbl_steps = tk.Label(right, textvariable=self.var_steps, anchor="w", width=24)
+        self.lbl_calls = tk.Label(right, textvariable=self.var_calls, anchor="w", width=24)
+        self.lbl_backs = tk.Label(right, textvariable=self.var_backs, anchor="w", width=24)
 
+        self.lbl_time.grid(row=4, column=0, sticky="w", pady=2)
+        self.lbl_steps.grid(row=5, column=0, sticky="w", pady=2)
+        self.lbl_calls.grid(row=6, column=0, sticky="w", pady=2)
+        self.lbl_backs.grid(row=7, column=0, sticky="w", pady=2)
+
+        # draw a blank grid to start
         self.draw_board(self.board)
 
     def _reset_stats_labels(self):
+        """Reset the right-hand stats text to defaults."""
         self.var_time.set("Time: —")
         self.var_steps.set("Steps: 0")
         self.var_calls.set("Recursive calls: 0")
         self.var_backs.set("Backtracks: 0")
 
     def on_clear(self):
-        self.board = [[0]*9 for _ in range(9)]
+        """Clear the current board and stats, then redraw."""
+        self.board = [[0] * 9 for _ in range(9)]
         self._reset_stats_labels()
         self.draw_board(self.board)
 
     def on_load(self):
-        path = filedialog.askopenfilename(
-            title="Open Sudoku (.csv or .txt)",
-            filetypes=[("Sudoku Files", "*.csv *.txt"), ("All Files", "*.*")]
-        )
+        #Open a file chooser, read a Sudoku puzzle, and display it.
+        filetypes = [("Sudoku Files", "*.csv *.txt"), ("All Files", "*.*")]
+        path = filedialog.askopenfilename(title="Open Sudoku (.csv or .txt)",
+                                          filetypes=filetypes)
         if not path:
-            return
+            return  # user canceled the dialog
+
         try:
             grid = read_sudoku(path)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read file:\n{e}")
             return
+
         self.board = deepcopy(grid)
         self._reset_stats_labels()
         self.draw_board(self.board)
 
     def on_solve(self):
-        # ensure something is loaded
-        if not any(any(cell != 0 for cell in row) for row in self.board):
+        #Run the solver on a copy, update stats, and show the solved grid.
+        # ensure the board isn't all zeros
+        has_any_value = any(any(cell != 0 for cell in row) for row in self.board)
+        if not has_any_value:
             messagebox.showinfo("Info", "Load a puzzle first.")
             return
 
-        # solve on a copy; solver mutates in place
+        # solver mutates in place → work on a copy
         bcopy = deepcopy(self.board)
+
+        # solve_sudoku returns (ok, solved_board, elapsed_ms, stats)
         ok, solved_board, elapsed_ms, stats = solve_sudoku(bcopy, PEERS)
 
-        # update right-panel labels using returned stats
+        # update right-hand stats panel
         self.var_time.set(f"Time: {elapsed_ms:.2f} ms")
         self.var_steps.set(f"Steps: {stats.steps}")
         self.var_calls.set(f"Recursive calls: {stats.recursive_calls}")
@@ -480,17 +504,18 @@ class SudokuViewer:
             messagebox.showwarning("Unsolvable", "No solution exists for this puzzle.")
             return
 
-        # show solved board
+        # copy solved board into the GUI state and redraw
         self.board = solved_board
         self.draw_board(self.board)
 
-
     def draw_board(self, board):
+        #Paint the 9x9 grid and any digits onto the canvas.
         self.canvas.delete("all")
+
         x0 = PAD
         y0 = PAD
 
-        # cells + digits
+        # draw 81 cells (rectangles) and numbers
         for r in range(9):
             for c in range(9):
                 x1 = x0 + c * CELL_SIZE
@@ -498,40 +523,60 @@ class SudokuViewer:
                 x2 = x1 + CELL_SIZE
                 y2 = y1 + CELL_SIZE
 
-                self.canvas.create_rectangle(x1, y1, x2, y2, fill="white", outline="#bbb")
+                # light gray cell borders, white background
+                self.canvas.create_rectangle(
+                    x1, y1, x2, y2,
+                    fill="white",
+                    outline="#bbb"
+                )
 
-                v = board[r][c]
-                if v != 0:
-                    self.canvas.create_text((x1+x2)//2, (y1+y2)//2, text=str(v), font=FONT_CELL)
+                value = board[r][c]
+                if value != 0:
+                    self.canvas.create_text(
+                        (x1 + x2) // 2,
+                        (y1 + y2) // 2,
+                        text=str(value),
+                        font=FONT_CELL
+                    )
 
-        # bold 3x3 lines
+        # heavier lines to outline the 3x3 boxes
         for i in range(10):
-            width = 3 if i % 3 == 0 else 1
+            line_width = 3 if i % 3 == 0 else 1
+
+            # vertical line at column i
             xi = x0 + i * CELL_SIZE
+            self.canvas.create_line(xi, y0, xi, y0 + GRID_SIZE,
+                                    fill="#333", width=line_width)
+
+            # horizontal line at row i
             yi = y0 + i * CELL_SIZE
-            self.canvas.create_line(xi, y0, xi, y0 + GRID_SIZE, fill="#333", width=width)
-            self.canvas.create_line(x0, yi, x0 + GRID_SIZE, yi, fill="#333", width=width)
+            self.canvas.create_line(x0, yi, x0 + GRID_SIZE, yi,
+                                    fill="#333", width=line_width)
 
 
 def launch_viewer(initial_path=None):
+    #Create the Tk window and run the viewer. Optionally load a file at start.
     root = tk.Tk()
     app = SudokuViewer(root)
 
-    # if a path was provided on launch, try to load it
+    # if the program was launched with a path, load it immediately
     if initial_path:
         try:
             grid = read_sudoku(initial_path)
-            app.board = deepcopy(grid)
-            app.draw_board(app.board)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read file:\n{e}")
+        else:
+            app.board = deepcopy(grid)
+            app.draw_board(app.board)
 
     root.mainloop()
 
 # If run directly:
 # - with a path: shows that puzzle
-# - without a path: shows blank grid
-if __name__ == "__main__":
-    # If user passed a file path (txt/csv), load it; else show blank
-    path_arg = sys.argv[1] if len(sys.argv) > 1 else None
+# - without a path: shows a blank grid
+if __name__ == "__main__": 
+    if len(sys.argv) > 1:
+        path_arg = sys.argv[1]
+    else:
+        path_arg = None
     launch_viewer(path_arg)
