@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox
 Coord = Tuple[int, int]
 
 def peers_of(r, c):
-    #Get peer coordinates for cell (r, c)
+    #Get peer coordinates of a coordinate (r, c)
     row = set()
     j = 0
     while j < 9:
@@ -75,105 +75,74 @@ class Stats:
     # - .csv branch uses Python's csv.reader (yields list[str] per row)
     # - .txt branch accepts either '530070000' style lines OR space-separated tokens
 
+def validate_sudoku_value(token):
+    #Convert a token to an int in 0..9; treat non-numeric or out-of-range as 0.
+    if token is None:
+        return 0
+    s = str(token).strip()
+    if s == "" or s == "." or s == "0":
+        return 0
+    try:
+        v = int(s)
+    except ValueError:
+        return 0
+    return v if 0 <= v <= 9 else 0
+
+
+def process_compact_line(line):
+    #Process compact digit lines (like '530070000'). Returns a 9-element list or [].
+    if line is None:
+        return []
+    cleaned = ''.join(ch for ch in line if ch.isdigit() or ch == '.')
+    if len(cleaned) < 9:
+        return []
+    row = []
+    for ch in cleaned[:9]:
+        row.append(validate_sudoku_value(ch))
+    return row
+
+
+def process_space_separated_line(line):
+    #Process space-separated token lines. Returns a 9-element list or [].
+    if line is None:
+        return []
+    replaced = line.replace('.', '0')
+    pieces = [t for t in replaced.split() if t]
+    if len(pieces) < 9:
+        return []
+    row = [validate_sudoku_value(pieces[i]) for i in range(9)]
+    return row
+
+
 def read_sudoku(path):
 
     _, ext = os.path.splitext(path) # get file extension
     ext = ext.lower() 
-
     grid = []
 
     if ext == ".csv":
         with open(path, newline="") as f:
-            rd = csv.reader(f) # lists of strings
-
+            rd = csv.reader(f)
             for raw_row in rd:
-                if not raw_row: # if empty row, skip
+                if not raw_row:
                     continue
-                vals = []
-                index = 0
-                # Only consider first 9 columns in the row
-                while index < 9 and index < len(raw_row):
-                    cell = raw_row[index]
-                    # Make sure it's a string and strip surrounding whitespace
-                    token = ("" if cell is None else str(cell)).strip()
-                    if token == "" or token == "." or token == "0":
-                        v = 0
-                    else:
-                        try:
-                            v = int(token)
-                        except ValueError: # If it isn't a valid integer (e.g., "x"), treat as empty (0)
-                            v = 0
-                        if v < 0 or v > 9: # Extra safety: keep only values in 0..9
-                            v = 0
-                    
-                    vals.append(v)
-                    index += 1
-
+                # only first 9 tokens per row
+                vals = [validate_sudoku_value(raw_row[i]) for i in range(min(9, len(raw_row)))]
                 if len(vals) == 9:
                     grid.append(vals)
-
     else:
-        # TEXT FILE READER:
-        # Accept two common formats:
-        # 1) compact digits like "530070000" (dots allowed, spaces ignored)
-        # 2) space-separated tokens "5 3 0 0 7 0 0 0 0"
         with open(path) as f:
             for line in f:
                 if line is None:
                     continue
-                line = line.strip() 
+                line = line.strip()
                 if line == "":
                     continue
 
-                row = []
-                
-                # compact style
-                cleaned = ""
-                k = 0
-                while k < len(line):
-                    ch = line[k]
-                    if ch.isdigit() or ch == ".":
-                        cleaned += ch
-                    k += 1
-
-                if len(cleaned) >= 9:
-                    idx = 0
-                    while idx < 9:
-                        ch = cleaned[idx]
-                        if ch == "." or ch == "0":
-                            row.append(0)
-                        else:
-                            try:
-                                val = int(ch)
-                            except ValueError:
-                                val = 0
-                            if val < 0 or val > 9:
-                                val = 0
-                            row.append(val)
-                        idx += 1
-                
-                # space-separated fallback
+                # try compact first, then space-separated
+                row = process_compact_line(line)
                 if len(row) != 9:
-                    replaced = line.replace(".", "0")
-                    pieces = replaced.split()
-                    tokens = []
-                    for t in pieces:
-                        if t:
-                            tokens.append(t)
-                    if len(tokens) >= 9:
-                        row = []
-                        t_index = 0
-                        while t_index < 9:
-                            t = tokens[t_index]
-                            try:
-                                v = int(t)
-                            except ValueError:
-                                v = 0
-                            if v < 0 or v > 9:
-                                v = 0
-                            row.append(v)
-                            t_index += 1
-
+                    row = process_space_separated_line(line)
                 if len(row) == 9:
                     grid.append(row)
 
@@ -187,43 +156,47 @@ def read_sudoku(path):
 # -----------------------------
 # SECTION: Solving 
 # -----------------------------
-def is_valid_board(board):
-    
-    # Return False if any row/col/box has a duplicate non-zero number
-    # Otherwise True. This rejects illegal inputs early
 
-    # rows
+def has_duplicates_nonzero(seq):
+    #Return True if seq contains duplicate non-zero values.
+    seen: Set[int] = set()
+    for v in seq:
+        if v != 0:
+            if v in seen:
+                return True
+            seen.add(v)
+    return False
+
+
+def rows_valid(board):
     for r in range(9):
-        seen = set()
-        for c in range(9):
-            v = board[r][c]
-            if v != 0:
-                if v in seen:
-                    return False
-                seen.add(v)
+        if has_duplicates_nonzero(board[r]):
+            return False
+    return True
 
-    # columns
+
+def cols_valid(board):
     for c in range(9):
-        seen = set()
-        for r in range(9):
-            v = board[r][c]
-            if v != 0:
-                if v in seen:
-                    return False
-                seen.add(v)
+        col = [board[r][c] for r in range(9)]
+        if has_duplicates_nonzero(col):
+            return False
+    return True
 
-    # 3x3 boxes 
-    for br in range(0, 9, 3):       # br = 0, 3, 6
-        for bc in range(0, 9, 3):   # bc = 0, 3, 6
-            seen = set()
+
+def boxes_valid(board):
+    for br in range(0, 9, 3):
+        for bc in range(0, 9, 3):
+            vals = []
             for r in range(br, br + 3):
                 for c in range(bc, bc + 3):
-                    v = board[r][c]
-                    if v != 0:
-                        if v in seen:
-                            return False
-                        seen.add(v)
+                    vals.append(board[r][c])
+            if has_duplicates_nonzero(vals):
+                return False
     return True
+
+
+def is_valid_board(board):
+    return rows_valid(board) and cols_valid(board) and boxes_valid(board)
 
 
 def board_complete(board):
@@ -234,23 +207,27 @@ def board_complete(board):
                 return False
     return True
 
-
-def possible_candidates(board, PEERS):
+def initial_candidate_grid(board):
+    #Create the initial candidate grid from `board`.
+    #Filled cells get singleton sets; empty cells get {1..9}.
     
-    # Build a 9x9 grid of candidate possible sets, then do a elimination pass
-    
+    full = {1,2,3,4,5,6,7,8,9}
     cand = []
     for r in range(9):
-        row_sets = []
+        row_sets: List[Set[int]] = []
         for c in range(9):
             v = board[r][c]
             if v != 0:
                 row_sets.append({v})
             else:
-                row_sets.append({1,2,3,4,5,6,7,8,9})
+                row_sets.append(set(full))
         cand.append(row_sets)
+    return cand
 
-    # repeatedly remove fixed values from peers until no change
+
+def peers_elimination(cand, peers):
+    #Iteratively remove singleton values from peers until no change.
+    
     changed = True
     while changed:
         changed = False
@@ -258,20 +235,34 @@ def possible_candidates(board, PEERS):
             for c in range(9):
                 if len(cand[r][c]) == 1:
                     v = next(iter(cand[r][c]))
-                    for peer in PEERS[(r, c)]:
-                        pr = peer[0]
-                        pc = peer[1]
-                        if v in cand[pr][pc] and len(cand[pr][pc]) > 1:
-                            cand[pr][pc].remove(v)
+                    for pr, pc in peers[(r, c)]:
+                        if v in cand[pr][pc]:
+                            cand[pr][pc].discard(v)
                             changed = True
     return cand
+
+def possible_candidates(board, PEERS):
+    #Returns possible candidates for each empty cell "0".
+    cand = initial_candidate_grid(board)
+    cand = peers_elimination(cand, PEERS)
+    return cand
+
+def update_candidates(board, cand, coord, value, peers):
+    #Remove `value` from candidate sets of coord's peers.
+    #Returns False when a contradiction is produced (an empty candidate set for an empty cell).
+    r, c = coord
+    for pr, pc in peers[(r, c)]:
+        if value in cand[pr][pc]:
+            cand[pr][pc].discard(value)
+            if board[pr][pc] == 0 and len(cand[pr][pc]) == 0:
+                return False
+    return True
 
 def fill_single(board, cand, PEERS, stats: Stats | None = None):
     
     # Fill any cell with exactly one candidate.
     # If stats is provided, count each placement as a step.
     # Return False on contradiction; True otherwise.
-    
     progress = True
     while progress:
         progress = False
@@ -284,15 +275,12 @@ def fill_single(board, cand, PEERS, stats: Stats | None = None):
                     if stats is not None:
                         stats.steps += 1  # count deterministic placement
 
-                    # remove v from peers
-                    for pr, pc in PEERS[(r, c)]:
-                        if v in cand[pr][pc]:
-                            cand[pr][pc].discard(v)
-                            if board[pr][pc] == 0 and len(cand[pr][pc]) == 0:
-                                return False
+                    # remove v from peers (use helper)
+                    if not update_candidates(board, cand, (r, c), v, PEERS):
+                        return False
                     progress = True
 
-        # global contradiction check
+        # global candidate contradiction check
         for r in range(9):
             for c in range(9):
                 if board[r][c] == 0 and len(cand[r][c]) == 0:
@@ -345,14 +333,8 @@ def solve_backtrack(board, cand, PEERS, stats: Stats | None = None, depth=0):
         if stats is not None:
             stats.steps += 1  # count the guess
 
-        # forward-check
-        consistent = True
-        for pr, pc in PEERS[(r, c)]:
-            if v in c2[pr][pc]:
-                c2[pr][pc].discard(v)
-                if b2[pr][pc] == 0 and len(c2[pr][pc]) == 0:
-                    consistent = False
-                    break
+        # forward-check using helper on the trial copy
+        consistent = update_candidates(b2, c2, (r, c), v, PEERS)
 
         if consistent and solve_backtrack(b2, c2, PEERS, stats=stats, depth=depth+1):
             # copy solution up
